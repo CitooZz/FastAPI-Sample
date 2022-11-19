@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    image: rukita:${RUKITA_VERSION:-latest}
+    restart: always
+    env_file:
+    - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      RUKITA_HOST: 0.0.0.0
+      RUKITA_DB_HOST: rukita-db
+      RUKITA_DB_PORT: 5432
+      RUKITA_DB_USER: rukita
+      RUKITA_DB_PASS: rukita
+      RUKITA_DB_BASE: rukita
+
+  db:
+    image: postgres:13.8-bullseye
+    hostname: rukita-db
+    ports:
+    - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: "rukita"
+      POSTGRES_USER: "rukita"
+      POSTGRES_DB: "rukita"
+    volumes:
+    - rukita-db-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: pg_isready -U rukita
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  migrator:
+    image: rukita:${RUKITA_VERSION:-latest}
+    restart: "no"
+    command: alembic upgrade head
+    environment:
+      RUKITA_DB_HOST: rukita-db
+      RUKITA_DB_PORT: 5432
+      RUKITA_DB_USER: rukita
+      RUKITA_DB_PASS: rukita
+      RUKITA_DB_BASE: rukita
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  rukita-db-data:
+    name: rukita-db-data
